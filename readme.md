@@ -38,12 +38,14 @@ idf_component_register(SRCS "REST.c"
 請將下方命令中的 192.168.1.1XX 替換為你的 ESP32 實際上線後取得的 IP 位址：
 
 Bash
-curl -X POST [http://192.168.1.1](http://192.168.1.1)XX/time
+curl -X POST http://192.168.1.1XX/time
+
 📥 預期回傳結果 (JSON Response)
 伺服器將會以高速響應標準的 JSON 字串，完美與主流 API 介面工具對接：
 
 JSON
 {"time":"2026-06-12 15:47:32"}
+
 📊 序列埠預期日誌輸出 (Log Output)
 當系統部署執行時，終端機 Monitor 將展現流暢的階段式初始化與監聽狀態：
 
@@ -54,6 +56,8 @@ I (1820) REST_TIME_SERVER: Starting SNTP...
 I (2450) REST_TIME_SERVER: Time synchronized
 I (2460) REST_TIME_SERVER: HTTP Server Started
 當外部電腦每執行一次 curl -X POST 請求，ESP32 都會立即捕獲並即時印出追蹤日誌：
+
+![測試結果截圖](images/result.png)
 
 Plaintext
 I (12540) REST_TIME_SERVER: POST /time
