@@ -152,6 +152,12 @@ static void obtain_time(void)
         == ESP_OK)
     {
         ESP_LOGI(TAG, "Time synchronized");
+		
+		// 🎯 關鍵加入：設定台北時區 (GMT+8)
+        setenv("TZ", "CST-8", 1);
+        tzset();
+        ESP_LOGI(TAG, "Timezone set to Taipei (CST-8)");
+		
     }
     else
     {
