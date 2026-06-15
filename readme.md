@@ -1,3 +1,44 @@
+# ESP32 RESTful API 測試伺服器 (Dual-Route RTC & MAC)
+
+本專案基於 ESP-IDF 框架，在 ESP32 上實現了一個輕量級的 HTTP RESTful 伺服器。專案啟動後會自動連線至指定的 Wi-Fi 熱點，透過 SNTP 協定同步台灣標準時間（CST-8），並提供兩個 POST 路由供外部端點查詢硬體資訊與系統時間。
+
+## 🚀 功能特點
+
+- **自動 Wi-Fi 連線與重連機制**：穩定連線至區域網路。
+- **SNTP 自動時間同步**：連線成功後自動同步 `pool.ntp.org` 網路時間，並校正為台北時區（CST-8）。
+- **雙路由 HTTP POST 服務**：
+  - `/mac`：讀取並回傳晶片實體網卡 MAC 位址。
+  - `/time`：即時回傳晶片內部 RTC 台灣標準時間。
+
+## 🛠️ API 介面規格與測試方法
+
+當 ESP32 成功就緒並取得 IP 位址後，您可以在同一個局域網內的電腦終端機（Terminal）使用 `curl` 指令發送 POST 請求進行測試：
+
+### 1. 查詢晶片 MAC 位址
+* **URL:** `http://<ESP32_IP_ADDRESS>/mac`
+* **Method:** `POST`
+* **測試指令:**
+  ```bash
+  curl -X POST http://<ESP32_IP_ADDRESS>/mac
+預期回應:
+
+Plaintext
+The device mac address = 24 0a c4 xx xx xx
+2. 查詢系統當前時間
+URL: http://<ESP32_IP_ADDRESS>/time
+
+Method: POST
+
+測試指令:
+
+Bash
+curl -X POST http://<ESP32_IP_ADDRESS>/time
+預期回應 (CST-8 格式):
+
+Plaintext
+2026-06-15 10:15:30
+
+--- 1st release
 # ESP32 RESTful 時間伺服器 (C 語言輕量級 HTTP Web Server 實作)
 
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.x-green.svg)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/)

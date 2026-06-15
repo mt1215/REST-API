@@ -16,11 +16,12 @@
 
 #include "esp_sntp.h"
 #include "esp_netif_sntp.h"
+#include "esp_mac.h"        // 🎯 讀取晶片實體 MAC 必備的標頭檔
 
 #define WIFI_SSID      "11-4"
 #define WIFI_PASSWORD  "********"
 
-static const char *TAG = "REST_TIME_SERVER";
+static const char *TAG = "REST_SERVER";
 
 static EventGroupHandle_t wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
@@ -32,8 +33,7 @@ static EventGroupHandle_t wifi_event_group;
 static void wifi_event_handler(
     void *arg,
     esp_event_base_t event_base,
-    int32_t event_id,
-    void *event_data)
+    int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT &&
         event_id == WIFI_EVENT_STA_START)
@@ -153,11 +153,9 @@ static void obtain_time(void)
     {
         ESP_LOGI(TAG, "Time synchronized");
 		
-		// 🎯 關鍵加入：設定台北時區 (GMT+8)
         setenv("TZ", "CST-8", 1);
         tzset();
         ESP_LOGI(TAG, "Timezone set to Taipei (CST-8)");
-		
     }
     else
     {
@@ -166,50 +164,51 @@ static void obtain_time(void)
 }
 
 /*--------------------------------------------------
-                REST POST /time
+     🎯 路由 1：POST /mac 的處理器（回傳 MAC）
 --------------------------------------------------*/
+static esp_err_t mac_post_handler(httpd_req_t *req)
+{
+    uint8_t mac[6];
+    char response[128];
 
-static esp_err_t time_post_handler(
-    httpd_req_t *req)
+    // 讀取晶片 STA 模式的硬體基頻 MAC 位址
+    if (esp_read_mac(mac, ESP_MAC_WIFI_STA) == ESP_OK) {
+        snprintf(
+            response,
+            sizeof(response),
+            "The ESP32-S3 device MAC address = %02x %02x %02x %02x %02x %02x\n",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    } else {
+        snprintf(response, sizeof(response), "Failed to read MAC address");
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
+
+    ESP_LOGI(TAG, "POST /mac -> Handled");
+    return ESP_OK;
+}
+
+/*--------------------------------------------------
+     🎯 路由 2：POST /time 的處理器（回傳機內時間）
+--------------------------------------------------*/
+static esp_err_t time_post_handler(httpd_req_t *req)
 {
     time_t now;
     struct tm timeinfo;
+    char response[64];
 
+    // 取得當前晶片內部 RTC 時間
     time(&now);
+    localtime_r(&now, &timeinfo);
 
-    localtime_r(
-        &now,
-        &timeinfo);
+    // 格式化時間字串 (例如: 2026-06-15 09:45:30)
+    strftime(response, sizeof(response), "The current time in ESP32-S3 is: %Y-%m-%d %H:%M:%S\n", &timeinfo);
 
-    char time_string[64];
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
 
-    strftime(
-        time_string,
-        sizeof(time_string),
-        "%Y-%m-%d %H:%M:%S",
-        &timeinfo);
-
-    char response[128];
-
-    snprintf(
-        response,
-        sizeof(response),
-        "{\"time\":\"%s\"}",
-        time_string);
-
-    httpd_resp_set_type(
-        req,
-        "application/json");
-
-    httpd_resp_send(
-        req,
-        response,
-        HTTPD_RESP_USE_STRLEN);
-
-    ESP_LOGI(
-        TAG,
-        "POST /time");
-
+    ESP_LOGI(TAG, "POST /time -> Handled");
     return ESP_OK;
 }
 
@@ -220,31 +219,30 @@ static esp_err_t time_post_handler(
 static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
-
-    httpd_config_t config =
-        HTTPD_DEFAULT_CONFIG();
-
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = 80;
 
-    if (httpd_start(
-            &server,
-            &config)
-        == ESP_OK)
+    if (httpd_start(&server, &config) == ESP_OK)
     {
+        // 1. 註冊 /mac 路由
+        httpd_uri_t mac_uri = {
+            .uri = "/mac",
+            .method = HTTP_POST,
+            .handler = mac_post_handler,
+            .user_ctx = NULL
+        };
+        httpd_register_uri_handler(server, &mac_uri);
+
+        // 2. 註冊 /time 路由
         httpd_uri_t time_uri = {
             .uri = "/time",
             .method = HTTP_POST,
             .handler = time_post_handler,
             .user_ctx = NULL
         };
+        httpd_register_uri_handler(server, &time_uri);
 
-        httpd_register_uri_handler(
-            server,
-            &time_uri);
-
-        ESP_LOGI(
-            TAG,
-            "HTTP Server Started");
+        ESP_LOGI(TAG, "HTTP Server Started with /mac and /time routes");
     }
 
     return server;
