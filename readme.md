@@ -38,6 +38,7 @@ curl -X POST http://<ESP32_IP_ADDRESS>/time
 Plaintext
 2026-06-15 10:15:30
 
+![REST API 測試結果](images/result20260615.png)
 --- 1st release
 # ESP32 RESTful 時間伺服器 (C 語言輕量級 HTTP Web Server 實作)
 
